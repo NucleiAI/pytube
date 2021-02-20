@@ -3,6 +3,7 @@
 import gzip
 import json
 import os
+from unittest import mock
 
 import pytest
 
@@ -19,35 +20,62 @@ def load_playback_file(filename):
         return json.loads(content)
 
 
-def load_and_init_from_playback_file(filename):
+@mock.patch('pytube.request.urlopen')
+def load_and_init_from_playback_file(filename, mock_urlopen):
     """Load a gzip json playback file and create YouTube instance."""
     pb = load_playback_file(filename)
-    yt = YouTube(pb["url"], defer_prefetch_init=True)
-    yt.watch_html = pb["watch_html"]
-    yt.js = pb["js"]
-    yt.vid_info = pb["video_info"]
-    yt.descramble()
-    return yt
+
+    # Mock the responses to YouTube
+    mock_url_open_object = mock.Mock()
+    mock_url_open_object.read.side_effect = [
+        pb['watch_html'].encode('utf-8'),
+        pb['vid_info_raw'].encode('utf-8'),
+        pb['js'].encode('utf-8')
+    ]
+    mock_urlopen.return_value = mock_url_open_object
+
+    return YouTube(pb["url"])
 
 
 @pytest.fixture
 def cipher_signature():
-    """Youtube instance initialized with video id 9bZkp7q19f0."""
-    filename = "yt-video-9bZkp7q19f0.json.gz"
+    """Youtube instance initialized with video id 2lAe1cqCOXo."""
+    filename = "yt-video-2lAe1cqCOXo-html.json.gz"
     return load_and_init_from_playback_file(filename)
 
 
 @pytest.fixture
 def presigned_video():
     """Youtube instance initialized with video id QRS8MkLhQmM."""
-    filename = "yt-video-QRS8MkLhQmM.json.gz"
+    filename = "yt-video-QRS8MkLhQmM-html.json.gz"
     return load_and_init_from_playback_file(filename)
 
 
 @pytest.fixture
 def age_restricted():
-    """Youtube instance initialized with video id zRbsm3e2ltw."""
-    filename = "yt-video-irauhITDrsE.json.gz"
+    """Youtube instance initialized with video id irauhITDrsE."""
+    filename = "yt-video-irauhITDrsE-html.json.gz"
+    return load_playback_file(filename)
+
+
+@pytest.fixture
+def private():
+    """Youtube instance initialized with video id m8uHb5jIGN8."""
+    filename = "yt-video-m8uHb5jIGN8-html.json.gz"
+    return load_playback_file(filename)
+
+
+@pytest.fixture
+def missing_recording():
+    """Youtube instance initialized with video id 5YceQ8YqYMc."""
+    filename = "yt-video-5YceQ8YqYMc-html.json.gz"
+    return load_playback_file(filename)
+
+
+@pytest.fixture
+def region_blocked():
+    """Youtube instance initialized with video id hZpzr8TbF08."""
+    filename = "yt-video-hZpzr8TbF08-html.json.gz"
     return load_playback_file(filename)
 
 
@@ -78,13 +106,26 @@ def playlist_long_html():
 
 
 @pytest.fixture
+def playlist_submenu_html():
+    """Youtube playlist HTML loaded on 2020-01-24 from
+    https://www.youtube.com/playlist?list=PLZHQObOWTQDMsr9K-rj53DwVRMYO3t5Yr"""
+    file_path = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        "mocks",
+        "playlist_submenu.html.gz",
+    )
+    with gzip.open(file_path, "rb") as f:
+        return f.read().decode("utf-8")
+
+
+@pytest.fixture
 def stream_dict():
     """Youtube instance initialized with video id WXxV9g7lsFE."""
     file_path = os.path.join(
         os.path.dirname(os.path.realpath(__file__)),
         "mocks",
-        "yt-video-WXxV9g7lsFE.json.gz",
+        "yt-video-WXxV9g7lsFE-html.json.gz",
     )
     with gzip.open(file_path, "rb") as f:
-        content = f.read().decode("utf-8")
-        return json.loads(content)
+        content = json.loads(f.read().decode("utf-8"))
+        return content['watch_html']

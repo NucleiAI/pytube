@@ -14,6 +14,7 @@ from typing import BinaryIO
 from typing import Dict
 from typing import Optional
 from typing import Tuple
+from urllib.error import HTTPError
 from urllib.parse import parse_qs
 
 from pytube import extract
@@ -74,7 +75,7 @@ class Stream:
         itag_profile = get_format_profile(self.itag)
         self.is_dash = itag_profile["is_dash"]
         self.abr = itag_profile["abr"]  # average bitrate (audio streams only)
-        self.fps = itag_profile[
+        self.fps = stream[
             "fps"
         ]  # frames per second (video streams only)
         self.resolution = itag_profile[
@@ -153,7 +154,12 @@ class Stream:
             Filesize (in bytes) of the stream.
         """
         if self._filesize is None:
-            self._filesize = request.filesize(self.url)
+            try:
+                self._filesize = request.filesize(self.url)
+            except HTTPError as e:
+                if e.code != 404:
+                    raise
+                self._filesize = request.seq_filesize(self.url)
         return self._filesize
 
     @property
@@ -250,11 +256,21 @@ class Stream:
         )
 
         with open(file_path, "wb") as fh:
-            for chunk in request.stream(self.url):
-                # reduce the (bytes) remainder by the length of the chunk.
-                bytes_remaining -= len(chunk)
-                # send to the on_progress callback.
-                self.on_progress(chunk, fh, bytes_remaining)
+            try:
+                for chunk in request.stream(self.url):
+                    # reduce the (bytes) remainder by the length of the chunk.
+                    bytes_remaining -= len(chunk)
+                    # send to the on_progress callback.
+                    self.on_progress(chunk, fh, bytes_remaining)
+            except HTTPError as e:
+                if e.code != 404:
+                    raise
+                # Some adaptive streams need to be requested with sequence numbers
+                for chunk in request.seq_stream(self.url):
+                    # reduce the (bytes) remainder by the length of the chunk.
+                    bytes_remaining -= len(chunk)
+                    # send to the on_progress callback.
+                    self.on_progress(chunk, fh, bytes_remaining)
         self.on_complete(file_path)
         return file_path
 

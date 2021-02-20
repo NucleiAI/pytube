@@ -4,9 +4,10 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-typing_extensions = "*"
 
 [dev-packages]
+bumpversion = "*"
+twine = "*"
 black = "==19.10b0"
 codecov = "*"
 coveralls = "*"
@@ -20,7 +21,6 @@ flake8-comprehensions ="*"
 flake8-eradicate = "*"
 flake8-executable = "*"
 flake8-if-expr = "*"
-flake8-isort = "*"
 flake8-logging-format = "*"
 flake8-mock = "*"
 flake8-mutable = "*"
